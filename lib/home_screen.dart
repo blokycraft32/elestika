@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
+import 'listrik_provider.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -12,14 +16,86 @@ class _HomeScreenState extends State<HomeScreen> {
     text: '850000',
   );
 
-  double estimasiTagihan = 769000;
   double batasAnggaran = 850000;
+
+  // Daftar warna untuk potongan grafik donat
+  final List<Color> grafikColors = [
+    Color(0xFFF43F5E), // Merah Muda
+    Color(0xFF34D399), // Hijau
+    Color(0xFFFDE047), // Kuning
+    Color(0xFF06B6D4), // Biru
+    Colors.purpleAccent,
+    Colors.orangeAccent,
+  ];
+
+  // Fungsi untuk menentukan tarif dasar listrik per kWh
+  double get tarifKwh {
+    if (selectedDaya.contains('900')) return 1352.0;
+    return 1444.70;
+  }
+
+  // Fungsi mengubah angka jadi format Rupiah (Titik)
+  String formatRupiah(double angka) {
+    return angka
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Membaca data dari Provider
+    final listrik = Provider.of<ListrikProvider>(context);
+    double totalKwh = listrik.totalKwh;
+    double estimasiTagihan = totalKwh * tarifKwh;
+
+    // Kalkulasi panjang Progress Bar
     double progress = estimasiTagihan / batasAnggaran;
     if (progress > 1.0) progress = 1.0;
     if (progress < 0.0 || progress.isNaN) progress = 0.0;
+
+    // MEMBANGUN DATA GRAFIK SECARA DINAMIS
+    List<PieChartSectionData> pieSections = [];
+    List<Widget> legendItems = [];
+
+    if (totalKwh == 0) {
+      // Jika data kosong, tampilkan donat abu-abu
+      pieSections.add(
+        PieChartSectionData(
+          color: Colors.grey[300],
+          value: 100,
+          title: '',
+          radius: 20,
+        ),
+      );
+      legendItems.add(_buildLegendItem(Colors.grey, "Belum ada alat", "0%"));
+    } else {
+      // Menghitung persentase setiap ruangan
+      int colorIndex = 0;
+      listrik.kwhPerRuangan.forEach((ruangan, kwh) {
+        double percentage = (kwh / totalKwh) * 100;
+        Color sectionColor = grafikColors[colorIndex % grafikColors.length];
+
+        pieSections.add(
+          PieChartSectionData(
+            color: sectionColor,
+            value: percentage,
+            title: '',
+            radius: 20,
+          ),
+        );
+        legendItems.add(
+          _buildLegendItem(
+            sectionColor,
+            ruangan,
+            "${percentage.toStringAsFixed(1)}%",
+          ),
+        );
+        colorIndex++;
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
@@ -90,7 +166,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(height: 8),
                   Row(
                     children: [
-                      // Dropdown Daya Listrik
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +215,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       SizedBox(width: 16),
-                      // TextField Anggaran
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 16),
 
+            // KARTU 2: ESTIMASI TAGIHAN (DINAMIS)
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(20.0),
@@ -217,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Divider(color: Colors.white24, thickness: 1),
                   SizedBox(height: 8),
                   Text(
-                    "Rp 769.000",
+                    "Rp ${formatRupiah(estimasiTagihan)}",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 36,
@@ -232,22 +307,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(color: Colors.white, fontSize: 12),
                       ),
                       Text(
-                        "267.9 kWh",
+                        "${totalKwh.toStringAsFixed(1)} kWh",
                         style: TextStyle(
                           color: Colors.amber,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Text(
-                        "Standby Loss: ",
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                      Text(
-                        "Rp. 47.200",
-                        style: TextStyle(
-                          color: Colors.redAccent,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -263,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                       Text(
-                        "Rp ${batasAnggaran.toInt()}",
+                        "Rp ${formatRupiah(batasAnggaran)}",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -273,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   SizedBox(height: 8),
-                  // Custom Progress Bar Dinamis
+                  // Progress Bar Dinamis
                   Stack(
                     children: [
                       Container(
@@ -302,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 16),
 
-            // KARTU 3: GRAFIK DONAT (fl_chart)
+            // KARTU 3: GRAFIK DONAT
             Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -320,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Estimasi Tagihan Bulan Ini",
+                    "Proporsi Ruangan",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   SizedBox(height: 16),
@@ -338,35 +400,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 PieChartData(
                                   sectionsSpace: 2,
                                   centerSpaceRadius: 45,
-                                  sections: [
-                                    PieChartSectionData(
-                                      color: Color(0xFFF43F5E),
-                                      value: 30,
-                                      title: '',
-                                      radius: 20,
-                                    ), // Pink
-                                    PieChartSectionData(
-                                      color: Color(0xFF34D399),
-                                      value: 30,
-                                      title: '',
-                                      radius: 20,
-                                    ), // Hijau
-                                    PieChartSectionData(
-                                      color: Color(0xFFFDE047),
-                                      value: 30,
-                                      title: '',
-                                      radius: 20,
-                                    ), // Kuning
-                                    PieChartSectionData(
-                                      color: Color(0xFF06B6D4),
-                                      value: 30,
-                                      title: '',
-                                      radius: 20,
-                                    ), // Biru
-                                  ],
+                                  sections: pieSections,
                                 ),
                               ),
-                              // Ikon Tengah Donat
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -376,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     size: 24,
                                   ),
                                   Text(
-                                    "267.9 kWh",
+                                    "${totalKwh.toStringAsFixed(1)} kWh",
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
@@ -388,36 +424,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      // Bagian Kanan: Keterangan (Legend)
+                      SizedBox(width: 16),
+                      // Bagian Kanan: Legend (Keterangan)
                       Expanded(
                         flex: 1,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildLegendItem(
-                              Color(0xFFF43F5E),
-                              "Ruangan 1",
-                              "30%",
-                            ),
-                            SizedBox(height: 12),
-                            _buildLegendItem(
-                              Color(0xFF34D399),
-                              "Ruangan 2",
-                              "30%",
-                            ),
-                            SizedBox(height: 12),
-                            _buildLegendItem(
-                              Color(0xFFFDE047),
-                              "Ruangan 3",
-                              "30%",
-                            ),
-                            SizedBox(height: 12),
-                            _buildLegendItem(
-                              Color(0xFF06B6D4),
-                              "Ruangan 4",
-                              "30%",
-                            ),
-                          ],
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: legendItems,
                         ),
                       ),
                     ],
@@ -431,24 +445,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Fungsi bantuan untuk membuat teks Legend di samping grafik
+  // Fungsi untuk menyusun teks Legend dengan aman agar tidak error layout
   Widget _buildLegendItem(Color color, String title, String percentage) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(fontSize: 12, color: Colors.black87),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(width: 8),
-            Text(title, style: TextStyle(fontSize: 12, color: Colors.black87)),
-          ],
-        ),
-        Text(percentage, style: TextStyle(fontSize: 12, color: Colors.black87)),
-      ],
+          ),
+          Text(
+            percentage,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
