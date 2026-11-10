@@ -398,44 +398,52 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF191970,
-                                  ).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.power_rounded,
-                                  color: Color(0xFF191970),
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    device['name'].toString(),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF191970,
+                                    ).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  Text(
-                                    '${device['watt']} • ${device['usage']}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                  child: const Icon(
+                                    Icons.power_rounded,
+                                    color: Color(0xFF191970),
+                                    size: 20,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        device['name'].toString(),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '${device['watt']} • ${device['usage']}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             'Rp ${_formatCurrency((device['cost'] as num).toDouble())}',
                             style: const TextStyle(
@@ -469,41 +477,76 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
         (maxHistoryAmount > budgetTarget ? maxHistoryAmount : budgetTarget) *
         1.25;
 
-    final lastMonthData = monthlyHistory.last;
-    final bool isOverBudget = (lastMonthData['amount'] as num) > budgetTarget;
+    final selectedMonthData =
+        monthlyHistory[_selectedBarIndex ?? (monthlyHistory.length - 1)];
+    final bool isOverBudget =
+        (selectedMonthData['amount'] as num) > budgetTarget;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(100),
-        child: AppBar(
-          backgroundColor: const Color(0xFF191970),
-          elevation: 0,
-          toolbarHeight: 100,
-          title: Row(
-            children: [
-              Image.asset('assets/logo.png', height: 36),
-              const SizedBox(width: 12),
-              const Text(
-                'Estikalis',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 20.0),
-              child: Icon(Icons.info, color: Color(0xFFFFC107), size: 32),
+        preferredSize: const Size.fromHeight(64.0),
+        child: Container(
+          height: 64.0,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF111147), Color.fromARGB(255, 18, 18, 219)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-          ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Image.asset('assets/logo.png', width: 26),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Estikalis",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Atur IP Server API Dosen',
+                        onPressed: () => showServerApiDialog(context),
+                        icon: Icon(
+                          Icons.dns_rounded,
+                          color: listrik.isApiConnected
+                              ? Colors.greenAccent
+                              : Colors.white70,
+                          size: 21,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Info Kode Meteran Fisik',
+                        onPressed: () => showKodeMeteranDialog(context),
+                        icon: const Icon(
+                          Icons.info,
+                          color: Colors.amber,
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -530,24 +573,30 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: const [
-                          Icon(
-                            Icons.bar_chart,
-                            color: Color(0xFF3F51B5),
-                            size: 28,
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            'Tren Pemakaian',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                              color: Colors.black87,
+                      const Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.bar_chart,
+                              color: Color(0xFF3F51B5),
+                              size: 26,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Tren Pemakaian',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       const Text(
                         'Sentuh batang grafik',
                         style: TextStyle(
@@ -775,14 +824,18 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text(
-                  'Rincian Tagihan',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    color: Color(0xFF191970),
+                Expanded(
+                  child: Text(
+                    'Rincian Tagihan',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 17,
+                      color: Color(0xFF191970),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                SizedBox(width: 8),
                 Text(
                   'Klik untuk detail',
                   style: TextStyle(
@@ -832,52 +885,59 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: itemOver
-                                          ? const Color(0xFFFFEBEE)
-                                          : const Color(0xFFE8F5E9),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      itemOver
-                                          ? Icons.trending_up
-                                          : Icons.trending_down,
-                                      color: itemOver
-                                          ? Colors.redAccent
-                                          : Colors.green,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Bulan ${item['month']}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 15,
-                                          color: Colors.black87,
-                                        ),
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: itemOver
+                                            ? const Color(0xFFFFEBEE)
+                                            : const Color(0xFFE8F5E9),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Total: ${item['kwh']} kWh',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      child: Icon(
+                                        itemOver
+                                            ? Icons.trending_up
+                                            : Icons.trending_down,
+                                        color: itemOver
+                                            ? Colors.redAccent
+                                            : Colors.green,
+                                        size: 22,
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Bulan ${item['month']}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 14.5,
+                                              color: Colors.black87,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Total: ${item['kwh']} kWh',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
@@ -885,14 +945,14 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                                     'Rp ${_formatCurrency((item['amount'] as num).toDouble())}',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 15,
+                                      fontSize: 14.5,
                                       color: Color(0xFF191970),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
+                                      horizontal: 8,
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
@@ -920,24 +980,30 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.event_available,
-                                    size: 16,
-                                    color: Color(0xFF191970),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Tgl Bayar: ${_formatDate(item['paymentDate'] as DateTime)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                      color: Colors.black87,
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.event_available,
+                                      size: 16,
+                                      color: Color(0xFF191970),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Tgl Bayar: ${_formatDate(item['paymentDate'] as DateTime)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                          color: Colors.black87,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               InkWell(
                                 onTap: () {
                                   _selectPaymentDate(context, item);
@@ -951,8 +1017,8 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                                     color: Colors.amber.shade100,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  child: Row(
-                                    children: const [
+                                  child: const Row(
+                                    children: [
                                       Icon(
                                         Icons.edit_calendar,
                                         size: 14,

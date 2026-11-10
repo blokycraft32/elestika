@@ -11,27 +11,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String selectedDaya = '1300 VA (R-1)';
-  TextEditingController anggaranController = TextEditingController(
-    text: '850000',
-  );
-
-  double batasAnggaran = 850000;
+  late TextEditingController anggaranController;
 
   // Daftar warna untuk potongan grafik donat
   final List<Color> grafikColors = [
-    Color(0xFFF43F5E), // Merah Muda
-    Color(0xFF34D399), // Hijau
-    Color(0xFFFDE047), // Kuning
-    Color(0xFF06B6D4), // Biru
+    const Color(0xFFF43F5E), // Merah Muda
+    const Color(0xFF34D399), // Hijau
+    const Color(0xFFFDE047), // Kuning
+    const Color(0xFF06B6D4), // Biru
     Colors.purpleAccent,
     Colors.orangeAccent,
   ];
 
-  // Fungsi untuk menentukan tarif dasar listrik per kWh
-  double get tarifKwh {
-    if (selectedDaya.contains('900')) return 1352.0;
-    return 1444.70;
+  @override
+  void initState() {
+    super.initState();
+    final listrik = Provider.of<ListrikProvider>(context, listen: false);
+    anggaranController = TextEditingController(
+      text: listrik.batasAnggaran.toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    anggaranController.dispose();
+    super.dispose();
   }
 
   // Fungsi mengubah angka jadi format Rupiah (Titik)
@@ -49,10 +53,11 @@ class _HomeScreenState extends State<HomeScreen> {
     // Membaca data dari Provider
     final listrik = Provider.of<ListrikProvider>(context);
     double totalKwh = listrik.totalKwh;
-    double estimasiTagihan = totalKwh * tarifKwh;
+    double batasAnggaran = listrik.batasAnggaran;
+    double estimasiTagihan = totalKwh * listrik.tarifKwh;
 
     // Kalkulasi panjang Progress Bar
-    double progress = estimasiTagihan / batasAnggaran;
+    double progress = batasAnggaran > 0 ? estimasiTagihan / batasAnggaran : 0.0;
     if (progress > 1.0) progress = 1.0;
     if (progress < 0.0 || progress.isNaN) progress = 0.0;
 
@@ -61,18 +66,16 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Widget> legendItems = [];
 
     if (totalKwh == 0) {
-      // Jika data kosong, tampilkan donat abu-abu
       pieSections.add(
         PieChartSectionData(
           color: Colors.grey[300],
           value: 100,
           title: '',
-          radius: 20,
+          radius: 18,
         ),
       );
       legendItems.add(_buildLegendItem(Colors.grey, "Belum ada alat", "0%"));
     } else {
-      // Menghitung persentase setiap ruangan
       int colorIndex = 0;
       listrik.kwhPerRuangan.forEach((ruangan, kwh) {
         double percentage = (kwh / totalKwh) * 100;
@@ -83,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: sectionColor,
             value: percentage,
             title: '',
-            radius: 20,
+            radius: 18,
           ),
         );
         legendItems.add(
@@ -100,10 +103,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(100.0),
+        preferredSize: const Size.fromHeight(64.0),
         child: Container(
-          height: 100.0,
-          decoration: BoxDecoration(
+          height: 64.0,
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF111147), Color.fromARGB(255, 18, 18, 219)],
               begin: Alignment.topCenter,
@@ -118,19 +121,42 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      Image.asset('assets/logo.png', width: 30),
-                      SizedBox(width: 8),
-                      Text(
+                      Image.asset('assets/logo.png', width: 26),
+                      const SizedBox(width: 8),
+                      const Text(
                         "Estikalis",
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 19,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  Icon(Icons.info, color: Colors.amber),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Atur IP Server API Dosen',
+                        onPressed: () => showServerApiDialog(context),
+                        icon: Icon(
+                          Icons.dns_rounded,
+                          color: listrik.isApiConnected
+                              ? Colors.greenAccent
+                              : Colors.white70,
+                          size: 21,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Info Kode Meteran Fisik',
+                        onPressed: () => showKodeMeteranDialog(context),
+                        icon: const Icon(
+                          Icons.info,
+                          color: Colors.amber,
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -138,15 +164,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
             // KARTU 1: PENGATURAN DASAR
             Container(
               decoration: BoxDecoration(
-                color: Color(0xFFFACC15),
+                color: const Color(0xFFFACC15),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black12,
                     blurRadius: 4,
@@ -154,33 +180,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              padding: EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     "Pengaturan Dasar",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  Divider(color: Colors.black26, thickness: 1),
-                  SizedBox(height: 8),
+                  const Divider(color: Colors.black26, thickness: 1, height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "DAYA LISTRIK",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 10.5,
                                 color: Colors.black54,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              height: 38,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
@@ -188,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   isExpanded: true,
-                                  value: selectedDaya,
+                                  value: listrik.selectedDaya,
                                   items:
                                       [
                                         '900 VA (R-1)',
@@ -199,14 +225,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                           value: value,
                                           child: Text(
                                             value,
-                                            style: TextStyle(fontSize: 14),
+                                            style: const TextStyle(fontSize: 12),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         );
                                       }).toList(),
                                   onChanged: (newValue) {
-                                    setState(() {
-                                      selectedDaya = newValue!;
-                                    });
+                                    if (newValue != null) {
+                                      listrik.setSelectedDaya(newValue);
+                                    }
                                   },
                                 ),
                               ),
@@ -214,39 +241,44 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "ANGGARAN (RP)",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 10.5,
                                 color: Colors.black54,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Container(
+                              height: 38,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
                               ),
+                              alignment: Alignment.center,
                               child: TextField(
                                 controller: anggaranController,
                                 keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
+                                style: const TextStyle(fontSize: 12.5),
+                                decoration: const InputDecoration(
+                                  isDense: true,
                                   contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 14,
+                                    horizontal: 10,
+                                    vertical: 8,
                                   ),
                                   border: InputBorder.none,
                                 ),
                                 onChanged: (value) {
-                                  setState(() {
-                                    batasAnggaran = double.tryParse(value) ?? 1;
-                                  });
+                                  final parsed = double.tryParse(value);
+                                  if (parsed != null && parsed > 0) {
+                                    listrik.setBatasAnggaran(parsed);
+                                  }
                                 },
                               ),
                             ),
@@ -258,20 +290,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // KARTU 2: ESTIMASI TAGIHAN (DINAMIS)
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(14.0),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Color(0xFF111147), Color.fromARGB(255, 18, 18, 219)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black12,
                     blurRadius: 4,
@@ -282,77 +314,79 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     "Estimasi Tagihan Bulan Ini",
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 13,
                     ),
                   ),
-                  Divider(color: Colors.white24, thickness: 1),
-                  SizedBox(height: 8),
+                  const Divider(color: Colors.white24, thickness: 1, height: 12),
                   Text(
                     "Rp ${formatRupiah(estimasiTagihan)}",
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 36,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
+                      const Text(
                         "Konsumsi: ",
-                        style: TextStyle(color: Colors.white, fontSize: 12),
+                        style: TextStyle(color: Colors.white, fontSize: 11.5),
                       ),
                       Text(
                         "${totalKwh.toStringAsFixed(1)} kWh",
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.amber,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         "Batas Anggaran",
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                        style: TextStyle(color: Colors.white70, fontSize: 11.5),
                       ),
                       Text(
                         "Rp ${formatRupiah(batasAnggaran)}",
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   // Progress Bar Dinamis
                   Stack(
                     children: [
                       Container(
-                        height: 10,
+                        height: 8,
                         decoration: BoxDecoration(
                           color: Colors.white24,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       FractionallySizedBox(
                         widthFactor: progress,
                         child: Container(
-                          height: 10,
+                          height: 8,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             gradient: LinearGradient(
-                              colors: [Colors.greenAccent, Colors.teal],
+                              colors: estimasiTagihan > batasAnggaran
+                                  ? [Colors.redAccent, Colors.deepOrange]
+                                  : [Colors.greenAccent, Colors.teal],
                             ),
                           ),
                         ),
@@ -362,15 +396,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // KARTU 3: GRAFIK DONAT
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black12,
                     blurRadius: 4,
@@ -381,40 +415,40 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     "Proporsi Ruangan",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       // Bagian Kiri: Grafik
                       Expanded(
                         flex: 1,
                         child: SizedBox(
-                          height: 140,
+                          height: 115,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
                               PieChart(
                                 PieChartData(
                                   sectionsSpace: 2,
-                                  centerSpaceRadius: 45,
+                                  centerSpaceRadius: 36,
                                   sections: pieSections,
                                 ),
                               ),
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.bolt,
                                     color: Colors.amber,
-                                    size: 24,
+                                    size: 20,
                                   ),
                                   Text(
                                     "${totalKwh.toStringAsFixed(1)} kWh",
-                                    style: TextStyle(
-                                      fontSize: 10,
+                                    style: const TextStyle(
+                                      fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -424,7 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       // Bagian Kanan: Legend (Keterangan)
                       Expanded(
                         flex: 1,
@@ -448,27 +482,27 @@ class _HomeScreenState extends State<HomeScreen> {
   // Fungsi untuk menyusun teks Legend dengan aman agar tidak error layout
   Widget _buildLegendItem(Color color, String title, String percentage) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
         children: [
           Container(
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               title,
-              style: TextStyle(fontSize: 12, color: Colors.black87),
+              style: const TextStyle(fontSize: 11.5, color: Colors.black87),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Text(
             percentage,
-            style: TextStyle(
-              fontSize: 12,
+            style: const TextStyle(
+              fontSize: 11.5,
               color: Colors.black87,
               fontWeight: FontWeight.bold,
             ),

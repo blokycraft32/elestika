@@ -10,9 +10,9 @@ class SimulationScreen extends StatefulWidget {
 }
 
 class _SimulationScreenState extends State<SimulationScreen> {
-  String? _selectedDevice1;
+  String? _selectedDeviceId1;
   double _reduction1 = 2;
-  String? _selectedDevice2;
+  String? _selectedDeviceId2;
   double _reduction2 = 1;
 
   final TextEditingController _nominalController = TextEditingController(
@@ -21,7 +21,12 @@ class _SimulationScreenState extends State<SimulationScreen> {
   double _pjuTax = 2;
 
   final double _adminFee = 2000;
-  final double _kwhPrice = 1444.70;
+
+  @override
+  void dispose() {
+    _nominalController.dispose();
+    super.dispose();
+  }
 
   String _formatCurrency(double amount) {
     return amount
@@ -36,47 +41,63 @@ class _SimulationScreenState extends State<SimulationScreen> {
   Widget build(BuildContext context) {
     final listrik = Provider.of<ListrikProvider>(context);
     final List<Perangkat> daftarAlat = listrik.perangkatList;
+    final double kwhPrice = listrik.tarifKwh;
 
     double dailyConsumption = (listrik.totalKwh / 30) > 0
         ? (listrik.totalKwh / 30)
         : 5.0;
 
     if (daftarAlat.isNotEmpty) {
-      if (_selectedDevice1 == null ||
-          !daftarAlat.any((p) => p.nama == _selectedDevice1)) {
-        _selectedDevice1 = daftarAlat.first.nama;
+      if (_selectedDeviceId1 == null ||
+          !daftarAlat.any((p) => p.id == _selectedDeviceId1)) {
+        _selectedDeviceId1 = daftarAlat.first.id;
       }
-      if (_selectedDevice2 == null ||
-          !daftarAlat.any((p) => p.nama == _selectedDevice2)) {
-        _selectedDevice2 = daftarAlat.length > 1
-            ? daftarAlat[1].nama
-            : daftarAlat.first.nama;
+      if (daftarAlat.length > 1) {
+        if (_selectedDeviceId2 == null ||
+            !daftarAlat.any((p) => p.id == _selectedDeviceId2) ||
+            _selectedDeviceId2 == _selectedDeviceId1) {
+          final secondDevice = daftarAlat.firstWhere(
+            (p) => p.id != _selectedDeviceId1,
+            orElse: () => daftarAlat[1],
+          );
+          _selectedDeviceId2 = secondDevice.id;
+        }
+      } else {
+        _selectedDeviceId2 = null;
       }
     } else {
-      _selectedDevice1 = null;
-      _selectedDevice2 = null;
+      _selectedDeviceId1 = null;
+      _selectedDeviceId2 = null;
     }
 
     double totalSavingMonthly = 0;
+    Perangkat? alat1;
+    Perangkat? alat2;
 
-    if (daftarAlat.isNotEmpty &&
-        _selectedDevice1 != null &&
-        _selectedDevice2 != null) {
-      // PERBAIKAN: Menambahkan tipe kembalian <Perangkat> secara eksplisit
-      Perangkat alat1 = daftarAlat.firstWhere(
-        (p) => p.nama == _selectedDevice1,
+    if (daftarAlat.isNotEmpty && _selectedDeviceId1 != null) {
+      alat1 = daftarAlat.firstWhere(
+        (p) => p.id == _selectedDeviceId1,
         orElse: () => daftarAlat.first,
       );
-      Perangkat alat2 = daftarAlat.firstWhere(
-        (p) => p.nama == _selectedDevice2,
-        orElse: () => daftarAlat.first,
-      );
-
+      final double maxJam1 = alat1.jam.toDouble().clamp(1.0, 24.0);
+      final double effReduction1 = _reduction1.clamp(0.0, maxJam1);
       double saving1Monthly =
-          (alat1.watt / 1000) * _reduction1 * _kwhPrice * 30;
-      double saving2Monthly =
-          (alat2.watt / 1000) * _reduction2 * _kwhPrice * 30;
-      totalSavingMonthly = saving1Monthly + saving2Monthly;
+          (alat1.watt / 1000) * effReduction1 * kwhPrice * 30;
+      totalSavingMonthly += saving1Monthly;
+
+      if (daftarAlat.length > 1 && _selectedDeviceId2 != null) {
+        alat2 = daftarAlat.firstWhere(
+          (p) => p.id == _selectedDeviceId2,
+          orElse: () => daftarAlat[1],
+        );
+        final double maxJam2 = alat2.jam.toDouble().clamp(1.0, 24.0);
+        final double effReduction2 = _reduction2.clamp(0.0, maxJam2);
+        if (alat2.id != alat1.id) {
+          double saving2Monthly =
+              (alat2.watt / 1000) * effReduction2 * kwhPrice * 30;
+          totalSavingMonthly += saving2Monthly;
+        }
+      }
     }
 
     double totalSavingYearly = totalSavingMonthly * 12;
@@ -85,7 +106,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
     double netNominal = nominal > _adminFee ? nominal - _adminFee : 0;
     double pjuAmount = netNominal * (_pjuTax / 100);
     double electricityNet = netNominal - pjuAmount;
-    double kwhReceived = electricityNet > 0 ? electricityNet / _kwhPrice : 0;
+    double kwhReceived = electricityNet > 0 ? electricityNet / kwhPrice : 0;
     int estimatedDays = (kwhReceived / dailyConsumption).floor();
 
     if (estimatedDays < 0) {
@@ -95,9 +116,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(100.0),
+        preferredSize: const Size.fromHeight(64.0),
         child: Container(
-          height: 100.0,
+          height: 64.0,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF111147), Color.fromARGB(255, 18, 18, 219)],
@@ -113,19 +134,42 @@ class _SimulationScreenState extends State<SimulationScreen> {
                 children: [
                   Row(
                     children: [
-                      Image.asset('assets/logo.png', width: 30),
+                      Image.asset('assets/logo.png', width: 26),
                       const SizedBox(width: 8),
                       const Text(
                         "Simulasi",
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 19,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  const Icon(Icons.info, color: Colors.amber),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Atur IP Server API Dosen',
+                        onPressed: () => showServerApiDialog(context),
+                        icon: Icon(
+                          Icons.dns_rounded,
+                          color: listrik.isApiConnected
+                              ? Colors.greenAccent
+                              : Colors.white70,
+                          size: 21,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Info Kode Meteran Fisik',
+                        onPressed: () => showKodeMeteranDialog(context),
+                        icon: const Icon(
+                          Icons.info,
+                          color: Colors.amber,
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -133,11 +177,11 @@ class _SimulationScreenState extends State<SimulationScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 14.0),
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFFF7F8FF),
                 border: Border.all(color: const Color(0xFF3F51B5), width: 1.5),
@@ -164,55 +208,72 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: const [
+                        const Row(
+                          children: [
                             Icon(
                               Icons.layers_outlined,
                               color: Color(0xFF3F51B5),
-                              size: 28,
+                              size: 26,
                             ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Simulator Hemat Mandiri',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.black87,
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Simulator Hemat Mandiri',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black87,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                         _buildDynamicSliderBox(
                           daftarAlat: daftarAlat,
-                          selectedValue: _selectedDevice1!,
-                          reductionValue: _reduction1,
+                          selectedId: _selectedDeviceId1!,
+                          maxJam: (alat1?.jam ?? 24)
+                              .toDouble()
+                              .clamp(1.0, 24.0),
+                          reductionValue: _reduction1.clamp(
+                            0.0,
+                            (alat1?.jam ?? 24).toDouble().clamp(1.0, 24.0),
+                          ),
                           onDeviceChanged: (String? newValue) {
                             if (newValue != null) {
-                              setState(() => _selectedDevice1 = newValue);
+                              setState(() => _selectedDeviceId1 = newValue);
                             }
                           },
                           onSliderChanged: (val) {
                             setState(() => _reduction1 = val);
                           },
                         ),
+                        if (daftarAlat.length > 1 &&
+                            _selectedDeviceId2 != null) ...[
+                          const SizedBox(height: 12),
+                          _buildDynamicSliderBox(
+                            daftarAlat: daftarAlat,
+                            selectedId: _selectedDeviceId2!,
+                            maxJam: (alat2?.jam ?? 24)
+                                .toDouble()
+                                .clamp(1.0, 24.0),
+                            reductionValue: _reduction2.clamp(
+                              0.0,
+                              (alat2?.jam ?? 24).toDouble().clamp(1.0, 24.0),
+                            ),
+                            onDeviceChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() => _selectedDeviceId2 = newValue);
+                              }
+                            },
+                            onSliderChanged: (val) {
+                              setState(() => _reduction2 = val);
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
-                        _buildDynamicSliderBox(
-                          daftarAlat: daftarAlat,
-                          selectedValue: _selectedDevice2!,
-                          reductionValue: _reduction2,
-                          onDeviceChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() => _selectedDevice2 = newValue);
-                            }
-                          },
-                          onSliderChanged: (val) {
-                            setState(() => _reduction2 = val);
-                          },
-                        ),
-                        const SizedBox(height: 24),
                         Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             border: Border.all(color: Colors.green, width: 1.5),
@@ -226,20 +287,22 @@ class _SimulationScreenState extends State<SimulationScreen> {
                                 style: TextStyle(
                                   color: Colors.green,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Rp ${_formatCurrency(totalSavingMonthly)} / Bulan',
-                                    style: const TextStyle(
-                                      color: Color(0xFF2E7D32),
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 18,
+                                  Expanded(
+                                    child: Text(
+                                      'Rp ${_formatCurrency(totalSavingMonthly)} / Bulan',
+                                      style: const TextStyle(
+                                        color: Color(0xFF2E7D32),
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16.5,
+                                      ),
                                     ),
                                   ),
                                   Container(
@@ -268,9 +331,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       ],
                     ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFFDF2),
                 border: Border.all(color: Colors.amber, width: 1.5),
@@ -286,28 +349,30 @@ class _SimulationScreenState extends State<SimulationScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.menu_book, color: Colors.amber, size: 28),
-                      SizedBox(width: 12),
-                      Text(
-                        'Kalkulator Token Listrik',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black87,
+                  const Row(
+                    children: [
+                      Icon(Icons.menu_book, color: Colors.amber, size: 26),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Kalkulator Token Listrik',
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [20000, 50000, 100000, 200000].map((preset) {
                       bool isSelected = nominal == preset;
                       return Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 3.0),
                           child: InkWell(
                             onTap: () {
                               setState(
@@ -316,7 +381,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                               );
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? Colors.amber.shade100
@@ -333,7 +398,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                               child: Text(
                                 '${preset ~/ 1000}RB',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w800,
                                   color: isSelected
                                       ? Colors.amber.shade700
@@ -346,18 +411,18 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   const Text(
                     'Nominal Pembelian Token (Rp)',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Container(
-                    height: 45,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
@@ -372,8 +437,8 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       ),
                       decoration: const InputDecoration(
                         contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                          horizontal: 14,
+                          vertical: 10,
                         ),
                         border: InputBorder.none,
                       ),
@@ -382,11 +447,11 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   Text(
                     'Pajak Penerangan Jalan (PJU): ${_pjuTax.toInt()}%',
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: Colors.black54,
                     ),
@@ -408,9 +473,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFF282A7C),
                       borderRadius: BorderRadius.circular(12),
@@ -425,7 +490,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                         ),
                         const Divider(
                           color: Colors.white24,
-                          height: 24,
+                          height: 18,
                           thickness: 1,
                         ),
                         _buildResultRow(
@@ -436,7 +501,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                         ),
                         const Divider(
                           color: Colors.white24,
-                          height: 24,
+                          height: 18,
                           thickness: 1,
                         ),
                         _buildResultRow(
@@ -447,7 +512,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                         ),
                         const Divider(
                           color: Colors.white24,
-                          height: 24,
+                          height: 18,
                           thickness: 1,
                         ),
                         _buildResultRow(
@@ -470,13 +535,14 @@ class _SimulationScreenState extends State<SimulationScreen> {
 
   Widget _buildDynamicSliderBox({
     required List<Perangkat> daftarAlat,
-    required String selectedValue,
+    required String selectedId,
+    required double maxJam,
     required double reductionValue,
     required ValueChanged<String?> onDeviceChanged,
     required Function(double) onSliderChanged,
   }) {
     return Container(
-      padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: 6, left: 12, right: 12, bottom: 6),
       decoration: BoxDecoration(
         color: const Color(0xFFC5CAE9).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
@@ -491,14 +557,14 @@ class _SimulationScreenState extends State<SimulationScreen> {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     isExpanded: true,
-                    value: selectedValue,
+                    value: selectedId,
                     icon: const Icon(
                       Icons.arrow_drop_down,
                       color: Color(0xFF3F51B5),
                     ),
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
-                      fontSize: 13,
+                      fontSize: 12.5,
                       color: Colors.black87,
                     ),
                     onChanged: onDeviceChanged,
@@ -506,9 +572,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       Perangkat device,
                     ) {
                       return DropdownMenuItem<String>(
-                        value: device.nama,
+                        value: device.id,
                         child: Text(
-                          'Kurangi ${device.nama}',
+                          'Kurangi ${device.nama} (${device.ruangan})',
                           overflow: TextOverflow.ellipsis,
                         ),
                       );
@@ -518,29 +584,29 @@ class _SimulationScreenState extends State<SimulationScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${reductionValue.toInt()} Jam/hari',
+                '${reductionValue.toInt()} / ${maxJam.toInt()} Jam',
                 style: const TextStyle(
                   color: Color(0xFF3F51B5),
                   fontWeight: FontWeight.w900,
-                  fontSize: 12,
+                  fontSize: 11.5,
                 ),
               ),
             ],
           ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 12,
+              trackHeight: 10,
               activeTrackColor: Colors.white,
               inactiveTrackColor: Colors.white,
               thumbColor: const Color(0xFF5C6BC0),
               overlayColor: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
             ),
             child: Slider(
               value: reductionValue,
               min: 0,
-              max: 24,
-              divisions: 24,
+              max: maxJam,
+              divisions: maxJam.toInt() > 0 ? maxJam.toInt() : 1,
               onChanged: onSliderChanged,
             ),
           ),
@@ -558,20 +624,24 @@ class _SimulationScreenState extends State<SimulationScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
             color: valueColor,
             fontWeight: FontWeight.w800,
-            fontSize: 14,
+            fontSize: 13.5,
           ),
         ),
       ],
