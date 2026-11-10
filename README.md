@@ -8,8 +8,8 @@ Aplikasi Flutter untuk membantu pengguna menghitung estimasi tagihan listrik bul
 
 ### 1. Pertama Kali Clone (Jika belum punya foldernya)
 ```bash
-git clone https://github.com/blokycraft32/elestika.git
-cd elestika
+git clone https://github.com/Araaan747/estikalis.git
+cd estikalis
 flutter pub get
 flutter run -d edge
 ```
